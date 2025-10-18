@@ -1,0 +1,230 @@
+version: 2.1
+
+orbs:
+  node: circleci/node@5.1.0
+
+workflows:
+  deployment-pipeline:
+    jobs:
+      - integration-tests
+      - performance-tests
+      - security-scan
+      # Enable deployment jobs to match GitHub Actions deployment capability
+      - deploy-staging:
+          requires:
+            - integration-tests
+            - security-scan
+          filters:
+            branches:
+              only: main  # Deploy from main branch for demo
+      - deploy-production:
+          requires:
+            - integration-tests
+            - performance-tests
+            - security-scan
+            - deploy-staging  # Require staging to pass first
+          filters:
+            branches:
+              only: main  # Deploy from main branch for demo
+
+jobs:
+  integration-tests:
+    docker:
+      - image: cimg/node:18.17
+      - image: mongo:4.4
+        environment:
+          MONGO_INITDB_DATABASE: sweetspot_test
+    resource_class: medium
+    steps:
+      - checkout
+      - node/install-packages
+      - run:
+          name: Install Doppler CLI
+          command: |
+            # Install Doppler CLI using the official method for CircleCI
+            curl -Ls https://cli.doppler.com/install.sh | sudo bash
+            doppler --version
+      - run:
+          name: Wait for MongoDB
+          command: |
+            for i in {1..30}; do
+              if mongosh --eval "db.runCommand({ping: 1})" --quiet > /dev/null 2>&1; then
+                echo "MongoDB is ready"
+                break
+              elif mongo --eval "db.runCommand({ping: 1})" --quiet > /dev/null 2>&1; then
+                echo "MongoDB is ready (using mongo client)"
+                break
+              fi
+              echo "Waiting for MongoDB... ($i/30)"
+              sleep 2
+            done
+      - run:
+          name: Run Integration Tests with Doppler (if token exists) or fallback
+          command: |
+            if [ -n "${DOPPLER_TOKEN}" ]; then
+              echo "Using Doppler for environment variables"
+              doppler secrets download --no-file --format=env-no-quotes > .env.ci
+              set -a && source .env.ci && set +a
+            else
+              echo "Using fallback environment variables"
+              export MONGODB_URI="mongodb://127.0.0.1:27017/sweetspot_test"
+              export JWT_SECRET="test-secret-for-circleci-integration"
+              export NODE_ENV="test"
+              export PORT="3001"
+            fi
+            npm run test:integration
+          environment:
+            DOPPLER_PROJECT: sweetspotmarketplace
+            DOPPLER_CONFIG: dev
+      - store_test_results:
+          path: ./test-results
+      - store_artifacts:
+          path: ./test-results
+          destination: integration-test-results
+
+  performance-tests:
+    docker:
+      - image: cimg/node:18.17
+    resource_class: medium
+    steps:
+      - checkout
+      - node/install-packages
+      - run:
+          name: Install Doppler CLI
+          command: |
+            curl -Ls https://cli.doppler.com/install.sh | sudo bash
+            doppler --version
+      - run:
+          name: Run Performance Tests with Doppler (if token exists) or fallback
+          command: |
+            if [ -n "${DOPPLER_TOKEN}" ]; then
+              echo "Using Doppler for environment variables"
+              doppler secrets download --no-file --format=env-no-quotes > .env.ci
+              set -a && source .env.ci && set +a
+            else
+              echo "Using fallback environment variables for performance tests"
+              export NODE_ENV="test"
+            fi
+            npm run test:performance
+          environment:
+            DOPPLER_PROJECT: sweetspotmarketplace
+            DOPPLER_CONFIG: dev
+      - store_artifacts:
+          path: ./performance-results
+          destination: performance-reports
+
+  security-scan:
+    docker:
+      - image: cimg/node:18.17
+    steps:
+      - checkout
+      - node/install-packages
+      - run:
+          name: Run Security Audit
+          command: |
+            npm run security:scan
+
+  # Deployment jobs commented out for testing phase
+  # Can be re-enabled when proper staging/production configs are set up
+  deploy-staging:
+    docker:
+      - image: cimg/node:18.17
+    steps:
+      - checkout
+      - node/install-packages
+      - run:
+          name: Install Doppler CLI
+          command: |
+            curl -Ls https://cli.doppler.com/install.sh | sudo bash
+            doppler --version
+      - run:
+          name: Build Application with Doppler (if token exists) or fallback
+          command: |
+            if [ -n "${DOPPLER_TOKEN}" ]; then
+              echo "Building with Doppler environment variables (using dev config for testing)"
+              doppler secrets download --no-file --format=env-no-quotes > .env.ci
+              set -a && source .env.ci && set +a
+            else
+              echo "Building with fallback environment variables"
+              export NODE_ENV="staging"
+            fi
+            npm run build
+          environment:
+            DOPPLER_PROJECT: sweetspotmarketplace
+            DOPPLER_CONFIG: dev  # Use dev config for testing
+      - run:
+          name: Start Backend Server
+          command: |
+            nohup npm start &
+            sleep 10  # Wait for server to start (adjust as needed)
+      - run:
+          name: Deploy to Staging
+          command: |
+            npm run deploy:staging
+      - run:
+          name: Run Smoke Tests with Doppler (if token exists) or fallback
+          command: |
+            if [ -n "${DOPPLER_TOKEN}" ]; then
+              echo "Running smoke tests with Doppler environment variables"
+              doppler secrets download --no-file --format=env-no-quotes > .env.ci
+              set -a && source .env.ci && set +a
+            else
+              echo "Running smoke tests with fallback environment variables"
+              export NODE_ENV="staging"
+            fi
+            npm run test:smoke
+          environment:
+            DOPPLER_PROJECT: sweetspotmarketplace
+            DOPPLER_CONFIG: dev  # Use dev config for testing
+      - store_artifacts:
+          path: ./dist
+          destination: staging-build
+
+  deploy-production:
+    docker:
+      - image: cimg/node:18.17
+    steps:
+      - checkout
+      - node/install-packages
+      - run:
+          name: Install Doppler CLI
+          command: |
+            curl -Ls https://cli.doppler.com/install.sh | sudo bash
+            doppler --version
+      - run:
+          name: Build Application with Doppler (if token exists) or fallback
+          command: |
+            if [ -n "${DOPPLER_TOKEN}" ]; then
+              echo "Building with Doppler environment variables (using dev config for testing)"
+              doppler secrets download --no-file --format=env-no-quotes > .env.ci
+              set -a && source .env.ci && set +a
+            else
+              echo "Building with fallback environment variables"
+              export NODE_ENV="production"
+            fi
+            npm run build
+          environment:
+            DOPPLER_PROJECT: sweetspotmarketplace
+            DOPPLER_CONFIG: dev  # Use dev config for testing
+      - run:
+          name: Deploy to Production
+          command: |
+            npm run deploy:production
+      - run:
+          name: Run Health Check with Doppler (if token exists) or fallback
+          command: |
+            if [ -n "${DOPPLER_TOKEN}" ]; then
+              echo "Running health check with Doppler environment variables"
+              doppler secrets download --no-file --format=env-no-quotes > .env.ci
+              set -a && source .env.ci && set +a
+            else
+              echo "Running health check with fallback environment variables"
+              export NODE_ENV="production"
+            fi
+            npm run test:health
+          environment:
+            DOPPLER_PROJECT: sweetspotmarketplace
+            DOPPLER_CONFIG: dev  # Use dev config for testing
+      - store_artifacts:
+          path: ./dist
+          destination: production-build
