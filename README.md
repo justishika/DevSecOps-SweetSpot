@@ -231,13 +231,4 @@ npm run docker:prod
 ---
 
 **Developed By:**  
-**Ishika Mohol** – Full-Stack Developer & DevOps Engineer  
-- Complete backend API development with Express.js and MongoDB
-- Frontend development with React and modern UI components  
-- Docker containerization and multi-environment setup
-- Comprehensive testing implementation with Jest
-- Code quality standards with ESLint
-- Real-time monitoring with Prometheus and Grafana
-- CI/CD pipeline configuration and automation
-- Database design and MongoDB Atlas integration
-- Security implementation and best practices
+**Ishika Mohol** in collaboration with Hoor Parvaiz.
