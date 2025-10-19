@@ -1,0 +1,48 @@
+# Root docker-compose.yml - Points to development setup
+# This file is maintained for CI/CD compatibility
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: sweetspot-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: sweetspot
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - sweetspot-network
+
+  # SweetSpot Application
+  sweetspot-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sweetspot-app
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/sweetspot?authSource=admin
+      - JWT_SECRET=dev-jwt-secret-key-for-docker
+      - PORT=3001
+    volumes:
+      - ./uploads:/app/uploads
+    depends_on:
+      - mongodb
+    networks:
+      - sweetspot-network
+
+volumes:
+  mongodb_data:
+
+networks:
+  sweetspot-network:
+    driver: bridge

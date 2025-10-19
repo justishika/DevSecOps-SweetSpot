@@ -1,0 +1,19 @@
+name: Trigger CircleCI Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  trigger-circleci:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - name: Trigger CircleCI
+        run: |
+          echo "GitHub push detected - CircleCI pipeline should automatically trigger"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Repository: ${{ github.repository }}"

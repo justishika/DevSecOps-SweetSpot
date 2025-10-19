@@ -7,6 +7,7 @@
     "dev": "concurrently \"vite\" \"cross-env NODE_ENV=development node server/index.js\"",
     "build": "vite build",
     "preview": "vite preview",
+    "start": "cross-env NODE_ENV=production node server/index.js",
     "test": "jest --config=jest.config.mjs",
     "test:integration": "jest --config=jest.config.mjs server/__tests__/integration/",
     "test:performance": "node scripts/performance-test.js",
@@ -14,7 +15,19 @@
     "test:health": "node scripts/health-check.js",
     "security:scan": "npm audit --audit-level=high || echo 'Security scan completed - moderate vulnerabilities acceptable'",
     "deploy:staging": "npm run build && echo 'Deploying to staging environment...' && echo 'Staging deployment completed successfully!'",
-    "deploy:production": "npm run build && echo 'Deploying to production environment...' && echo 'Production deployment completed successfully!'"
+    "deploy:production": "npm run build && echo 'Deploying to production environment...' && echo 'Production deployment completed successfully!'",
+    "docker:dev": "docker-compose -f docker/development/docker-compose.yml up -d",
+    "docker:prod": "docker-compose -f docker/production/docker-compose.prod.yml up -d",
+    "docker:build": "docker build -t sweetspot-app .",
+    "docker:build:dev": "docker build -f docker/development/Dockerfile.dev -t sweetspot-app:dev .",
+    "docker:build:prod": "docker build -f docker/production/Dockerfile -t sweetspot-app:prod .",
+    "docker:stop": "docker-compose down",
+    "docker:stop:dev": "docker-compose -f docker/development/docker-compose.yml down",
+    "docker:stop:prod": "docker-compose -f docker/production/docker-compose.prod.yml down",
+    "docker:logs": "docker-compose logs -f",
+    "docker:logs:dev": "docker-compose -f docker/development/docker-compose.yml logs -f",
+    "docker:logs:prod": "docker-compose -f docker/production/docker-compose.prod.yml logs -f",
+    "docker:clean": "docker system prune -f && docker volume prune -f"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

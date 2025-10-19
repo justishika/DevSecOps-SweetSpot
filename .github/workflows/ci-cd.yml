@@ -129,6 +129,48 @@ jobs:
           package-lock.json
         retention-days: 30
 
+  docker-build:
+    needs: [test, build]
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        push: false
+        tags: sweetspot-app:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Test Docker image
+      run: |
+        docker run --rm -d --name test-container -p 3001:3001 \
+          -e NODE_ENV=test \
+          -e MONGODB_URI=mongodb://localhost:27017/test \
+          -e JWT_SECRET=test-secret \
+          sweetspot-app:latest
+        sleep 10
+        curl -f http://localhost:3001/api/health || exit 1
+        docker stop test-container
+
+    - name: Save Docker image
+      run: docker save sweetspot-app:latest | gzip > sweetspot-app.tar.gz
+
+    - name: Upload Docker image
+      uses: actions/upload-artifact@v4
+      with:
+        name: docker-image
+        path: sweetspot-app.tar.gz
+        retention-days: 7
+
   security-scan:
     runs-on: ubuntu-latest
     
