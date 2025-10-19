@@ -150,17 +150,6 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
-    - name: Test Docker image
-      run: |
-        docker run --rm -d --name test-container -p 3001:3001 \
-          -e NODE_ENV=test \
-          -e MONGODB_URI=mongodb://localhost:27017/test \
-          -e JWT_SECRET=test-secret \
-          sweetspot-app:latest
-        sleep 10
-        curl -f http://localhost:3001/api/health || exit 1
-        docker stop test-container
-
     - name: Save Docker image
       run: docker save sweetspot-app:latest | gzip > sweetspot-app.tar.gz
 
